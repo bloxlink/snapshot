@@ -30,14 +30,18 @@ loop = asyncio.get_event_loop()
 async def get_group_stats(group_id, session=None):
     session = session or aiohttp.ClientSession()
 
-    async with session.get(f"{GROUP_URL}/{group_id}") as response:
-        if response.status == 200:
-            json_data = await response.json()
-            member_count = json_data.get("memberCount")
+    try:
+        async with session.get(f"{GROUP_URL}/{group_id}") as response:
+            if response.status == 200:
+                json_data = await response.json()
+                member_count = json_data.get("memberCount")
 
-            return {
-                "memberCount": member_count
-            }
+                return {
+                    "memberCount": member_count
+                }
+
+    except aiohttp.client_exceptions.ServerDisconnectedError:
+        pass
 
     return {}
 
