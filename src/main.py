@@ -80,7 +80,7 @@ async def main():
 
         guild_data["groupIDs"] = group_ids
 
-        await r.db("bloxlink").table("guilds").insert(guild_data, conflict="replace").run()
+        await r.db("bloxlink").table("guilds").insert(guild_data, conflict="update").run()
 
     await conn.close()
     await session.close()
