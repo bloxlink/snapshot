@@ -9,8 +9,6 @@ try:
 except ImportError:
     import rethinkdb as r
 
-processing = 0
-
 try:
     from config import RETHINKDB
 except ImportError:
@@ -45,31 +43,8 @@ async def get_group_stats(group_id, session=None):
 
     return {}
 
-async def process_guild(guild_data, session, month_name, last_month_name, month_day):
-    group_ids = guild_data.get("groupIDs", {})
-
-    for group_id, group_data in group_ids.items():
-        stats = await get_group_stats(group_id, session=session)
-
-        group_data["stats"] = group_data.get("stats") or {}
-        group_data["stats"][month_name] = group_data.get(month_name) or {}
-        group_data["stats"][month_name][str(month_day)] = stats
-
-        if group_data["stats"].get(last_month_name):
-            group_data["stats"].pop(last_month_name, None)
-
-        group_ids[str(group_id)] = group_data
-
-    guild_data["groupIDs"] = group_ids
-
-    await r.db("bloxlink").table("guilds").insert(guild_data, conflict="update").run()
-
-    global processing
-    processing -= 1
-
 async def main():
     print("Starting snapshot.", flush=True)
-    global processing
 
     session = aiohttp.ClientSession()
     conn = await r.connect(
@@ -93,11 +68,23 @@ async def main():
     guilds = await r.db("bloxlink").table("guilds").filter(r.row.has_fields("groupIDs")).run()
 
     async for guild_data in guilds:
-        processing += 1
-        loop.create_task(process_guild(guild_data, session, month_name, last_month_name, month_day))
+        group_ids = guild_data.get("groupIDs", {})
 
-    while processing:
-        await asyncio.sleep(1)
+        for group_id, group_data in group_ids.items():
+            stats = await get_group_stats(group_id, session=session)
+
+            group_data["stats"] = group_data.get("stats") or {}
+            group_data["stats"][month_name] = group_data.get(month_name) or {}
+            group_data["stats"][month_name][str(month_day)] = stats
+
+            if group_data["stats"].get(last_month_name):
+                group_data["stats"].pop(last_month_name, None)
+
+            group_ids[str(group_id)] = group_data
+
+        guild_data["groupIDs"] = group_ids
+
+        await r.db("bloxlink").table("guilds").insert(guild_data, conflict="update").run()
 
     await conn.close()
     await session.close()
