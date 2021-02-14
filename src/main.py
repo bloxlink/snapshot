@@ -59,11 +59,8 @@ async def main():
 
     today = datetime.datetime.today()
     month_name = today.strftime("%B")
-    month_day  = today.day
-
-    first_day = datetime.datetime.today().replace(day=1)
-    last_month = first_day - datetime.timedelta(days=1)
-    last_month_name = last_month.strftime("%B")
+    month_day  = str(today.day)
+    year  = str(today.year)
 
     guilds = await r.db("bloxlink").table("guilds").filter(r.row.has_fields("groupIDs")).run()
 
@@ -74,17 +71,18 @@ async def main():
             stats = await get_group_stats(group_id, session=session)
 
             group_data["stats"] = group_data.get("stats") or {}
-            group_data["stats"][month_name] = group_data.get(month_name) or {}
-            group_data["stats"][month_name][str(month_day)] = stats
+            group_data["stats"][year] = group_data["stats"].get(year) or {}
+            group_data["stats"][year][month_name] = group_data["stats"][year].get(month_name) or {}
+            group_data["stats"][year][month_name][month_day] = stats
 
-            if group_data["stats"].get(last_month_name):
-                group_data["stats"].pop(last_month_name, None)
+            if group_data["stats"].get(month_name): # FIXME: temp
+                group_data["stats"].pop(month_name, None)
 
             group_ids[str(group_id)] = group_data
 
         guild_data["groupIDs"] = group_ids
 
-        await r.db("bloxlink").table("guilds").insert(guild_data, conflict="update").run()
+        await r.db("bloxlink").table("guilds").insert(guild_data, conflict="replace").run()
 
     await conn.close()
     await session.close()
